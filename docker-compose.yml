@@ -1,0 +1,38 @@
+services:
+  mongo:
+    image: mongo:7.0.5
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - 27017:27017
+    healthcheck:
+      test: test $$(mongosh --port 27017 --quiet --eval "try {rs.initiate({_id:'rs0',members:[{_id:0,host:\"mongo:27017\"}]})} catch(e) {rs.status().ok}") -eq 1
+      interval: 10s
+      start_period: 30s
+
+  gateway:
+    image: nginx:alpine
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    ports:
+      - 80:80
+    restart: always
+
+  # ui:
+  # build: ./ui
+
+  backend:
+    build: ./backend/compositor/
+    environment:
+      PORT: 8000
+      REQUEST_TIMEOUT: ${REQUEST_TIMEOUT}
+      NODE_TLS_REJECT_UNAUTHORIZED: 0
+      SYSTEM_UNAVAILABLE_URL: ${SYSTEM_UNAVAILABLE_URL}
+      EXAMPLES_SERVICE_URI: ${EXAMPLES_SERVICE_URI}
+
+  examples-service:
+    build: ./backend/services/examples-service
+    environment:
+      PORT: 8000
+      MONGO_URI: ${MONGO_URI}
+      EXAMPLES_COLLECTION_NAME: ${EXAMPLES_COLLECTION_NAME}
+  
